@@ -35,32 +35,33 @@ Expected file name: **`<ExeName>.ini`** (auto-matched to the executable name).
 
 ```ini
 [fortigate]
-; FortiGate GUI/API URL (HTTPS and port if non-default).
+; Base URL of your FortiGate (GUI address). Use https and the correct port.
 ; Examples:
 ;   https://fg1.example.com
 ;   https://192.168.1.1:4443
 baseUrl = https://fgt.example.com
 
-; VDOM name. Leave empty if VDOMs are disabled on your FortiGate.
-vdom =
+; VDOM name. If VDOMs are OFF, this might be omitted or must be blank or "root".
+vdom = root
 
-; API key for the FortiGate API user. You can paste the plain key here on first run.
-; The app verifies it and rewrites it as DPAPI-encrypted: enc:<base64>
-apiKey = <your API key>
+; API key for the FortiGate API user.
+; First run must use the plain text token. The app will verify it and then
+; rewrite this value as DPAPI-encrypted: enc:<base64>
+; IMPORTANT: The DPAPI encryption is per-user (CurrentUser). Run the app under
+; the same account that will execute it on schedule, or switch the code to LocalMachine.
+apiKey = PUT_YOUR_PLAIN_API_KEY_HERE_ON_FIRST_RUN
 
 [certificates]
-; Default Windows certificate store to search for all entries below
+; Default Windows certificate store to search for all subjects below.
+; Typical IIS/Win-ACME location is LocalMachine\My. Might be omitted for this default location.
 store = LocalMachine\My
 
-; List each subject you want synchronized (one per line).
-; The newest valid cert for this subject will be pushed to FortiGate.
+; List each subject you want synchronized. One subject per line.
+; Wildcards are fine (e.g., *.example.com). The app will pick the newest valid
+; certificate for that subject from the Windows store, compare to Forti, and
+; if newer/absent it will UPDATE the Forti certificate in place (same name/slot).
 subject = *.example.com
 subject = *.example.net
-
-; (Optional) Use a different store for subsequent subjects by inserting another
-; 'store =' line before them; the setting remains active until next 'store =' line.
-; store = CurrentUser\My
-; subject = api.internal.lan
 ```
 
 ---
@@ -78,7 +79,7 @@ config system api-user
         set accprofile super_admin
         config trusthost
             edit 1
-                set ipv4-trusthost 192.168.101.42 255.255.255.255
+                set ipv4-trusthost 192.168.1.42 255.255.255.255
             next
         end
     next
