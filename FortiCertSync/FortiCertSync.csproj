@@ -1,0 +1,67 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- Targets -->
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+		<!-- Lang/quality -->
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<EnableNETAnalyzers>true</EnableNETAnalyzers>
+		<AnalysisLevel>latest</AnalysisLevel>
+
+		<!-- AOT / trimming -->
+		<PublishAot>true</PublishAot>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<TrimMode>full</TrimMode>
+		<JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+
+		<!-- Assembly identity (shows in file properties) -->
+		<Title>FortiCertSync</Title>
+		<Product>FortiCertSync</Product>
+		<Description>Automatic sync of Windows-issued TLS certificates (e.g., ACME/Let's Encrypt) into FortiGate.</Description>
+		<NeutralLanguage>en</NeutralLanguage>
+		<Copyright>© 2025 Nikolay Ryazantsev</Copyright>
+
+		<!-- Versioning -->
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<InformationalVersion>1.0.0</InformationalVersion>
+
+		<!-- Deterministic builds / SourceLink friendliness -->
+		<Deterministic>true</Deterministic>
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+
+		<!-- XML doc file (suppresses missing-doc warnings) -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<NoWarn>$(NoWarn);CS1591</NoWarn>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<RepositoryUrl>https://github.com/nikriaz/FortiCertSync</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.8" />
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="Resources\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Embedded sample INI that we write on first run if INI is missing -->
+		<EmbeddedResource Include="Resources\FortiCertSync.sample.ini">
+			<LogicalName>FortiCertSync.SampleIni</LogicalName>
+		</EmbeddedResource>
+	</ItemGroup>
+
+</Project>
+
