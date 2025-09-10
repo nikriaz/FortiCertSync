@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using System.Reflection;
 
 namespace FortiCertSync;
 
@@ -10,8 +9,9 @@ internal static class Logger
 
     public static void Init(string baseName)
     {
-        // always use <assemblyname>.log
-        _file = $"{baseName}.log";
+        var exeDir = AppContext.BaseDirectory;
+        Directory.CreateDirectory(exeDir); // ensure dir exists
+        _file = Path.Combine(exeDir, $"{baseName}.log");
     }
 
     static void Write(string level, string msg)
@@ -25,8 +25,10 @@ internal static class Logger
             }
             catch
             {
-                // fallback: create new file with unique suffix if append failed
-                var fallback = $"{Path.GetFileNameWithoutExtension(_file)}_{DateTime.Now:yyyyMMdd_HHmmss}.log";
+                // fallback: unique log file in same directory
+                var dir = Path.GetDirectoryName(_file) ?? AppContext.BaseDirectory;
+                var fallback = Path.Combine(dir,
+                    $"{Path.GetFileNameWithoutExtension(_file)}_{DateTime.Now:yyyyMMdd_HHmmss}.log");
                 File.AppendAllText(fallback, msg + Environment.NewLine, Encoding.UTF8);
                 _file = fallback;
             }
@@ -37,3 +39,4 @@ internal static class Logger
     public static void Warn(string m) => Write("WARN", m);
     public static void Error(string m) => Write("ERROR", m);
 }
+

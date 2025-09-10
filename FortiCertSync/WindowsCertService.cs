@@ -5,7 +5,7 @@ namespace FortiCertSync;
 
 internal static class WindowsCertService
 {
-    public static X509Certificate2? FindNewestCertificate(string storePath, string subject)
+    public static X509Certificate2? FindNewestCertificate(string storePath, string subject, string? issuer = null)
     {
         var (loc, name) = ParseStore(storePath);
         using var store = new X509Store(name, loc);
@@ -14,6 +14,7 @@ internal static class WindowsCertService
         return store.Certificates
             .Cast<X509Certificate2>()
             .Where(c => c.HasPrivateKey && SubjectMatches(c, subject))
+            .Where(c => issuer is null || IssuerMatches(c, issuer))
             .OrderByDescending(c => c.NotAfter)
             .FirstOrDefault();
     }
@@ -55,4 +56,21 @@ internal static class WindowsCertService
         catch { }
         return false;
     }
+    private static bool IssuerMatches(X509Certificate2 c, string filter)
+    {
+        var dn = c.IssuerName?.Name ?? string.Empty;
+        string? cn = GetDnPart(dn, "CN");
+        string? o = GetDnPart(dn, "O");
+        return (cn?.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+            || (o?.IndexOf(filter, StringComparison.OrdinalIgnoreCase)  >= 0);
+    }
+
+    private static string? GetDnPart(string dn, string key)
+    {
+        foreach (var part in dn.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            if (part.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))
+                return part[(key.Length + 1)..];
+        return null;
+    }
+
 }
