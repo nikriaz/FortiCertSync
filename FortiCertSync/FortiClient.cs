@@ -147,25 +147,18 @@ internal sealed class FortiClient
 
     public async Task ImportLocalCertAsync(string? vdom, string mkey, string pfxPass, byte[] pfxBytes)
     {
-        using var x = new X509Certificate2(pfxBytes, pfxPass, X509KeyStorageFlags.Exportable);
-
-        var certDer = x.Export(X509ContentType.Cert);
-        byte[] keyDer;
-        if (x.GetRSAPrivateKey() is RSA rsa) { keyDer = rsa.ExportRSAPrivateKey(); }
-        else if (x.GetECDsaPrivateKey() is ECDsa ec) { keyDer = ec.ExportECPrivateKey(); }
-        else throw new Exception("Unsupported private key type; RSA or ECDSA required.");
-
         using var ms = new MemoryStream();
         using (var jw = new Utf8JsonWriter(ms))
         {
             jw.WriteStartObject();
-            jw.WriteString("type", "regular");
+            jw.WriteString("type", "pkcs12");
             jw.WriteString("certname", mkey);
+            jw.WriteString("password", pfxPass);
             jw.WriteString("scope", string.IsNullOrEmpty(vdom) || vdom.Equals("root", StringComparison.OrdinalIgnoreCase) ? "global" : "vdom");
-            jw.WriteString("file_content", Convert.ToBase64String(certDer));
-            jw.WriteString("key_file_content", Convert.ToBase64String(keyDer));
+            jw.WriteString("file_content", Convert.ToBase64String(pfxBytes));
             jw.WriteEndObject();
         }
+
         using var content = new ByteArrayContent(ms.ToArray());
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
@@ -181,17 +174,6 @@ internal sealed class FortiClient
         var resp = await _http.DeleteAsync(url);
         if (!resp.IsSuccessStatusCode) throw new Exception($"Delete cert {name} failed: {(int)resp.StatusCode} {await resp.Content.ReadAsStringAsync()}");
         Logger.Info($"Cert '{name}' has no references and was deleted.");
-    }
-
-    private string Url(string path, string? query = null, string? vdom = null)
-    {
-        var hasQ = !string.IsNullOrEmpty(query);
-        var sb = new StringBuilder(_baseUrl.Length + path.Length + 32);
-        sb.Append(_baseUrl).Append(path);
-        if (hasQ) sb.Append('?').Append(query);
-        if (!string.IsNullOrWhiteSpace(vdom))
-            sb.Append(hasQ ? '&' : '?').Append("vdom=").Append(Uri.EscapeDataString(vdom));
-        return sb.ToString();
     }
 
     public async Task<int> RebindAutoAsync(string? vdom, string oldSlotName, string newSlotName)
@@ -221,6 +203,69 @@ internal sealed class FortiClient
         return list.Count;
     }
 
+    public async Task ImportCaFromPfxAsync(string? vdom, string pfxPass, byte[] pfxBytes)
+    {
+        var scope = string.IsNullOrEmpty(vdom) || vdom.Equals("root", StringComparison.OrdinalIgnoreCase) ? "global" : "vdom";
+
+        var collection = new X509Certificate2Collection();
+        collection.Import(pfxBytes, pfxPass, X509KeyStorageFlags.Exportable);
+
+        // Leaf = the one with private key
+        var leaf = collection.Cast<X509Certificate2>().FirstOrDefault(c => c.HasPrivateKey);
+        if (leaf is null) return;
+
+        foreach (var c in collection.Cast<X509Certificate2>())
+        {
+            if (c.Thumbprint == leaf.Thumbprint) continue;
+
+            // Default: import intermediates, skip self-signed roots
+            if (c.Subject == c.Issuer) continue;
+            await ImportCaCertAsync(vdom, scope, c);
+        }
+    }
+
+    #region Internals
+    private async Task ImportCaCertAsync(string? vdom, string scope, X509Certificate2 caCert)
+    {
+        var der = caCert.Export(X509ContentType.Cert);
+
+        using var ms = new MemoryStream();
+        using (var jw = new Utf8JsonWriter(ms))
+        {
+            jw.WriteStartObject();
+            jw.WriteString("import_method", "file");
+            jw.WriteString("scope", scope);
+            jw.WriteString("file_content", Convert.ToBase64String(der));
+            jw.WriteEndObject();
+        }
+
+        using var content = new ByteArrayContent(ms.ToArray());
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+        var url = Url("/api/v2/monitor/vpn-certificate/ca/import", null, vdom);
+        var resp = await _http.PostAsync(url, content);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync();
+            Logger.Error($"Import CA certificate {caCert.Issuer} failed: {(int)resp.StatusCode} {body}");
+        }
+        else
+        {
+            Logger.Info($"Intermediate certificate {caCert.Issuer} was imported successfully");
+        }
+    }
+
+    private string Url(string path, string? query = null, string? vdom = null)
+    {
+        var hasQ = !string.IsNullOrEmpty(query);
+        var sb = new StringBuilder(_baseUrl.Length + path.Length + 32);
+        sb.Append(_baseUrl).Append(path);
+        if (hasQ) sb.Append('?').Append(query);
+        if (!string.IsNullOrWhiteSpace(vdom))
+            sb.Append(hasQ ? '&' : '?').Append("vdom=").Append(Uri.EscapeDataString(vdom));
+        return sb.ToString();
+    }
     private async Task<List<UsageRef>> FindUsageAsync(string? vdom, string mkey)
     {
         var query = $"q_path=vpn.certificate&q_name=local&mkey={Uri.EscapeDataString(mkey)}";
@@ -338,4 +383,6 @@ internal sealed class FortiClient
 
         return list;
     }
+
+    #endregion
 }

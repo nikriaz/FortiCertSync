@@ -41,6 +41,7 @@ try
             var store = sect.Get("store", defaultStore) ?? defaultStore;
             subject = sect.Get("subject");
             var issuer = sect.Get("issuer");
+            var forceUpdate = bool.TryParse(sect.Get("force"), out var v) && v;
 
             // 1) Find current cert in Forti inventory
             var fortiCerts = await forti.ListLocalCertsAsync(vdom);
@@ -61,7 +62,6 @@ try
             if (DateTime.UtcNow > winNotAfterUtc) { Logger.Warn($"[{subject}] Newest cert expired; skipping."); continue; }
             Logger.Info($"[{subject}] Windows newest: {winNotAfterUtc:yyyy-MM-dd} / {newestWindows.Thumbprint}");
 
-            var forceUpdate = false; //for debugging only
             var needImport = newestForti.ValidToUtc < winNotAfterUtc || forceUpdate;
             Logger.Info($"[{subject}] Forti newest: {newestForti.ValidToUtc:yyyy-MM-dd}.Import? {needImport}");
 
@@ -71,6 +71,7 @@ try
                 var newSlotName = $"{certName}_{DateTime.Now.Date:ddMMyyyy}";
                 var (pfxBytes, pfxPass) = WindowsCertService.ExportPkcs12(newestWindows);
                 await forti.ImportLocalCertAsync(vdom, newSlotName, pfxPass, pfxBytes);
+                await forti.ImportCaFromPfxAsync(vdom, pfxPass, pfxBytes);
                 Logger.Info($"[{subject}] Imported into slot '{newSlotName}'");
 
                 // 4) Rebound
