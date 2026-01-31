@@ -24,10 +24,10 @@
 		<Product>FortiCertSync</Product>
 		<Description>Automatic sync of Windows-issued TLS certificates (e.g., ACME/Let's Encrypt) into FortiGate.</Description>
 		<NeutralLanguage>en</NeutralLanguage>
-		<Copyright>© 2025 Nikolay Ryazantsev</Copyright>
+		<Copyright>© 2026 Nikolay Ryazantsev</Copyright>
 
 		<!-- Versioning -->
-		<VersionPrefix>1.0.2</VersionPrefix>
+		<VersionPrefix>1.0.3</VersionPrefix>
 		<AssemblyVersion>$(VersionPrefix)</AssemblyVersion>
 		<FileVersion>$(VersionPrefix)</FileVersion>
 		<InformationalVersion>$(VersionPrefix)</InformationalVersion>
